@@ -26,7 +26,7 @@ function CandCard({ c }: { c: CandidateResult }) {
 
       {/* Score row */}
       <div className="cc-score-row">
-        <ScoreRing value={c.final.score} size={60} color={statusColor(status)} label="score" />
+        <ScoreRing value={c.final.score} size={60} color={statusColor(status)} label="" />
         <div className="cc-score-details">
           <div className="csd-row">
             <span className="csd-label">AI Score</span>

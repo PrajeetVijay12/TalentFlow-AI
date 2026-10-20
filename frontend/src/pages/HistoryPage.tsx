@@ -89,7 +89,7 @@ function DetailModal({ id, onClose }: { id: number; onClose: () => void }) {
                   <Badge status={status} />
                 </div>
                 <div className="cc-score-row">
-                  <ScoreRing value={c.final.score} size={56} color={statusColor(status)} label="score" />
+                  <ScoreRing value={c.final.score} size={56} color={statusColor(status)} label="" />
                   <div className="cc-score-details">
                     <div className="csd-row"><span className="csd-label">Score</span><span className="csd-val" style={{ color: statusColor(status) }}>{c.final.score !== null ? Number(c.final.score.toFixed(1)) : '—'}</span></div>
                     <div className="csd-row"><span className="csd-label">Exp</span><span className="csd-val">{c.profile.experience} yr</span></div>

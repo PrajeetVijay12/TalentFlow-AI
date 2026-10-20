@@ -134,7 +134,7 @@ export function ScoreRing({ value, size = 120, color = '#6366f1', label = 'score
         <circle className="val" cx={size / 2} cy={size / 2} r={r} fill="none" strokeWidth="10" strokeLinecap="round" stroke={color}
           strokeDasharray={c} strokeDashoffset={c * (1 - Math.min(v, 100) / 100)} />
       </svg>
-      <div className="txt"><b>{value === null ? '—' : Number(value.toFixed(1))}</b><small>{label}</small></div>
+      <div className="txt"><b style={size < 80 ? { fontSize: Math.round(size * 0.34) } : undefined}>{value === null ? '—' : Number(value.toFixed(1))}</b>{label && <small>{label}</small>}</div>
     </div>
   )
 }
