@@ -178,8 +178,18 @@ _TC_LABELS = {
 }
 
 
+def _setup_for_user(n: int, uid: int) -> None:
+    """Clear existing data, set job, insert candidates — pipeline is left for the browser to trigger."""
+    job, template_candidates = _TC_DATA[n]
+    db.clear_candidates(uid)
+    db.save_job(uid, job)
+    for cand in template_candidates:
+        sha = hashlib.sha256(f"tc{n}:{cand.name}".encode()).hexdigest()
+        db.add_candidate(uid, sha, cand)
+
+
 def _load_for_user(n: int, uid: int) -> dict:
-    """Core logic: clear, set job, insert candidates, run pipeline, save run."""
+    """Clear, set job, insert candidates, run pipeline, save run — for the POST endpoint."""
     job, template_candidates = _TC_DATA[n]
     db.clear_candidates(uid)
     db.save_job(uid, job)
@@ -232,13 +242,15 @@ def launch_testcase(n: int, response: Response):
     else:
         uid = db.create_user(TC_DEMO_EMAIL, TC_DEMO_NAME, auth.hash_password(TC_DEMO_PASSWORD))
 
-    # Load TC data and run pipeline
-    _load_for_user(n, uid)
+    # Load candidates + job (no pipeline run — the browser triggers it with the animation)
+    _setup_for_user(n, uid)
 
     # Set a session cookie so the browser is logged in as this user
     token, token_hash = auth.new_token()
     db.create_session(uid, token_hash, time.time() + auth.SESSION_SECONDS)
-    redirect = RedirectResponse(url="/shortlist", status_code=302)
+    # Redirect to /pipeline?autorun=1 — the pipeline page detects this and starts the
+    # workflow animation automatically, then navigates to results when done.
+    redirect = RedirectResponse(url="/pipeline?autorun=1", status_code=302)
     redirect.set_cookie(COOKIE, token, max_age=auth.SESSION_SECONDS,
                         httponly=True, samesite="lax", path="/")
     return redirect

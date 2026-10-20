@@ -74,8 +74,8 @@ def run_testcase(n: int, label: str) -> None:
     info(f"URL: {launch_url}")
     time.sleep(1)
     webbrowser.open(launch_url)
-    ok("Browser opened!  The page will load, run the pipeline, and")
-    ok("redirect you to the Shortlist with all results ready.\n")
+    ok("Browser opened!  The pipeline will start automatically —")
+    ok("watch each stage run, then results appear when done.\n")
 
     # ── 3. Keep server alive ──────────────────────────────────────────────────
     if server_proc:
