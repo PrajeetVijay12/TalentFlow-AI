@@ -13,18 +13,15 @@ from pathlib import Path
 
 ROOT    = Path(__file__).resolve().parent.parent
 VENV_PY = ROOT / ".venv" / "Scripts" / "python.exe"
+BASE_URL = "http://127.0.0.1:8000"
 
-TC_EMAIL    = "tc_demo@talentflow.ai"
-TC_PASSWORD = "TcDemo@99"
-TC_NAME     = "TC Demo User"
-BASE_URL    = "http://127.0.0.1:8000"
 
-# ── print helpers (flush=True so output appears immediately in .bat windows) ──
-def _p(sym, msg, end="\n"):
-    print(f"  {sym} {msg}", end=end, flush=True)
+def _p(sym, msg):
+    print(f"  {sym} {msg}", flush=True)
 
-def info(msg):  _p(">>", msg)
-def ok(msg):    _p("OK", msg)
+def info(msg): _p(">>", msg)
+def ok(msg):   _p("OK", msg)
+
 def fail(msg):
     _p("!!", msg)
     try:
@@ -47,37 +44,6 @@ def _server_running() -> bool:
         return False
 
 
-def _post_json(url: str, body: dict, cookies: dict) -> tuple[int, dict, dict]:
-    """Minimal JSON POST using only stdlib. Returns (status, json_body, new_cookies)."""
-    import json, urllib.request, urllib.error, http.cookiejar
-
-    data = json.dumps(body).encode()
-    req  = urllib.request.Request(url, data=data,
-                                  headers={"Content-Type": "application/json"})
-    # attach existing cookies
-    if cookies:
-        req.add_header("Cookie", "; ".join(f"{k}={v}" for k, v in cookies.items()))
-
-    try:
-        with urllib.request.urlopen(req, timeout=180) as resp:
-            resp_body = json.loads(resp.read())
-            # parse Set-Cookie header(s)
-            new_cookies = dict(cookies)
-            for line in resp.headers.get_all("Set-Cookie") or []:
-                part = line.split(";")[0].strip()
-                if "=" in part:
-                    k, v = part.split("=", 1)
-                    new_cookies[k.strip()] = v.strip()
-            return resp.status, resp_body, new_cookies
-    except urllib.error.HTTPError as e:
-        resp_body = {}
-        try:
-            resp_body = json.loads(e.read())
-        except Exception:
-            pass
-        return e.code, resp_body, cookies
-
-
 def run_testcase(n: int, label: str) -> None:
     print(f"\n{'='*62}", flush=True)
     print(f"  TalentFlow AI  --  {label}", flush=True)
@@ -94,7 +60,6 @@ def run_testcase(n: int, label: str) -> None:
              "--host", "127.0.0.1", "--port", "8000"],
             cwd=str(ROOT),
         )
-        # Poll until healthy (up to 30 s)
         for i in range(60):
             time.sleep(0.5)
             if _server_running():
@@ -103,55 +68,18 @@ def run_testcase(n: int, label: str) -> None:
             if i == 59:
                 fail("Server did not start in 30 s — is port 8000 free?")
 
-    # ── 2. Authenticate ───────────────────────────────────────────────────────
-    info("Authenticating ...")
-    cookies: dict = {}
-
-    status, _, cookies = _post_json(
-        f"{BASE_URL}/api/auth/register",
-        {"name": TC_NAME, "email": TC_EMAIL, "password": TC_PASSWORD},
-        cookies,
-    )
-    if status == 200:
-        ok(f"Registered as {TC_EMAIL}")
-    elif status == 409:
-        status2, _, cookies = _post_json(
-            f"{BASE_URL}/api/auth/login",
-            {"email": TC_EMAIL, "password": TC_PASSWORD},
-            cookies,
-        )
-        if status2 == 200:
-            ok(f"Logged in as {TC_EMAIL}")
-        else:
-            fail(f"Login failed (HTTP {status2})")
-    else:
-        fail(f"Auth failed (HTTP {status})")
-
-    # ── 3. Load test case ─────────────────────────────────────────────────────
-    info(f"Loading test case {n} and running pipeline (may take ~30 s) ...")
-    status3, data, _ = _post_json(
-        f"{BASE_URL}/api/testcase/{n}", {}, cookies,
-    )
-    if status3 != 200:
-        fail(f"Failed to load TC{n}: {data}")
-
-    ok(f"Test case loaded!  {data['total']} candidates processed.")
-    print(flush=True)
-    print(f"    Selected : {data['selected']}", flush=True)
-    print(f"    Wait List: {data['waitlist']}", flush=True)
-    print(f"    Rejected : {data['rejected']}", flush=True)
-
-    # ── 4. Open browser ───────────────────────────────────────────────────────
-    print(flush=True)
-    info("Opening browser ...")
+    # ── 2. Open the launch URL — the server logs in + loads data + redirects ─
+    launch_url = f"{BASE_URL}/api/testcase/launch/{n}"
+    info(f"Opening browser — loading test case {n} ...")
+    info(f"URL: {launch_url}")
     time.sleep(1)
-    webbrowser.open(f"{BASE_URL}/shortlist")
-    ok(f"Done!  Browser opened to http://127.0.0.1:8000/shortlist")
+    webbrowser.open(launch_url)
+    ok("Browser opened!  The page will load, run the pipeline, and")
+    ok("redirect you to the Shortlist with all results ready.\n")
 
-    # ── 5. Keep server alive ──────────────────────────────────────────────────
-    print(flush=True)
+    # ── 3. Keep server alive ──────────────────────────────────────────────────
     if server_proc:
-        print("  Server is running. Close this window (or press Ctrl+C) to stop it.\n", flush=True)
+        print("  Server is running. Close this window (or Ctrl+C) to stop.\n", flush=True)
         try:
             server_proc.wait()
         except KeyboardInterrupt:

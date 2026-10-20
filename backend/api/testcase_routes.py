@@ -9,12 +9,14 @@ full pipeline, and saves the result so the frontend shows it instantly.
 from __future__ import annotations
 
 import hashlib
+import time
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Response
+from fastapi.responses import RedirectResponse
 
-from backend.api.auth_routes import current_user
+from backend.api.auth_routes import current_user, COOKIE
 from backend.models.schemas import CandidateProfile, JobRequirements, Project
-from backend.services import database as db
+from backend.services import auth, database as db
 from backend.services.pipeline import run_pipeline
 
 router = APIRouter(prefix="/api")
@@ -176,28 +178,29 @@ _TC_LABELS = {
 }
 
 
-# ── Endpoint ──────────────────────────────────────────────────────────────────
+def _load_for_user(n: int, uid: int) -> dict:
+    """Core logic: clear, set job, insert candidates, run pipeline, save run."""
+    job, template_candidates = _TC_DATA[n]
+    db.clear_candidates(uid)
+    db.save_job(uid, job)
+    for cand in template_candidates:
+        sha = hashlib.sha256(f"tc{n}:{cand.name}".encode()).hexdigest()
+        db.add_candidate(uid, sha, cand)
+    loaded = db.list_candidates(uid)
+    result = run_pipeline(job, loaded)
+    db.save_run(uid, result)
+    return result
+
+
+# ── POST endpoint (used by old terminal scripts) ─────────────────────────────
 @router.post("/testcase/{n}", dependencies=[Depends(current_user)])
 def load_testcase(n: int, user: dict = Depends(current_user)):
     if n not in _TC_DATA:
         raise HTTPException(400, detail="Test case must be 1, 2, or 3.")
 
-    job, template_candidates = _TC_DATA[n]
-
-    # Clear existing data for this user so the UI starts fresh
-    db.clear_candidates(user["id"])
-    db.save_job(user["id"], job)
-
-    # Insert each candidate directly (bypass file upload / parsing)
-    for cand in template_candidates:
-        sha = hashlib.sha256(f"tc{n}:{cand.name}".encode()).hexdigest()
-        db.add_candidate(user["id"], sha, cand)
-
-    # Run the full 11-stage pipeline
-    loaded = db.list_candidates(user["id"])
-    result = run_pipeline(job, loaded)
-    db.save_run(user["id"], result)
-
+    if n not in _TC_DATA:
+        raise HTTPException(400, detail="Test case must be 1, 2, or 3.")
+    result = _load_for_user(n, user["id"])
     s = result["summary"]
     return {
         "ok": True,
@@ -208,3 +211,34 @@ def load_testcase(n: int, user: dict = Depends(current_user)):
         "waitlist": s["Wait List"],
         "rejected": s["Rejected"],
     }
+
+
+# ── GET /api/testcase/launch/{n}  — browser-friendly one-click loader ─────────
+# Opens this URL in the browser: auto-registers/logs in the demo user,
+# loads the test case, runs the pipeline, then redirects to /shortlist.
+TC_DEMO_EMAIL    = "tc_demo@talentflow.ai"
+TC_DEMO_PASSWORD = "TcDemo@99"
+TC_DEMO_NAME     = "TC Demo"
+
+@router.get("/testcase/launch/{n}")
+def launch_testcase(n: int, response: Response):
+    if n not in _TC_DATA:
+        raise HTTPException(400, detail="Test case must be 1, 2, or 3.")
+
+    # Register or get existing demo user
+    existing = db.user_by_email(TC_DEMO_EMAIL)
+    if existing:
+        uid = existing["id"]
+    else:
+        uid = db.create_user(TC_DEMO_EMAIL, TC_DEMO_NAME, auth.hash_password(TC_DEMO_PASSWORD))
+
+    # Load TC data and run pipeline
+    _load_for_user(n, uid)
+
+    # Set a session cookie so the browser is logged in as this user
+    token, token_hash = auth.new_token()
+    db.create_session(uid, token_hash, time.time() + auth.SESSION_SECONDS)
+    redirect = RedirectResponse(url="/shortlist", status_code=302)
+    redirect.set_cookie(COOKIE, token, max_age=auth.SESSION_SECONDS,
+                        httponly=True, samesite="lax", path="/")
+    return redirect
