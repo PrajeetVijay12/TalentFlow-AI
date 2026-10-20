@@ -11,6 +11,7 @@ from fastapi.responses import FileResponse
 
 from backend.api.auth_routes import router as auth_router
 from backend.api.routes import public, router
+from backend.api.testcase_routes import router as tc_router
 from backend.services.database import init_db
 
 DIST = Path(__file__).resolve().parent.parent / "frontend" / "dist"
@@ -27,6 +28,7 @@ init_db()
 app.include_router(auth_router)
 app.include_router(public)
 app.include_router(router)
+app.include_router(tc_router)
 
 
 if (DIST / "index.html").exists():
