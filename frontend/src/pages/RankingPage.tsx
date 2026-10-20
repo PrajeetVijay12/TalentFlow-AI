@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom'
 import { Bar, BarChart, CartesianGrid, Cell, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { Avatar, Badge, Card, NeedRun, PageHead, ScoreBar, ScoreRing, fmt, statusColor } from '../components/ui'
 import { useApp } from '../state'
+import { downloadAllReports } from '../utils/reportGenerator'
 
 export default function RankingPage() {
   const { run } = useApp()
@@ -33,7 +34,10 @@ export default function RankingPage() {
         eyebrow="Step 4 of 4 · Final Decision"
         title="Shortlist"
         desc={`AI screening for "${run.job.title}" — ${selected.length} shortlisted, ${waitList.length} on wait list.`}
-        actions={<button className="btn" onClick={exportCsv}>Export CSV</button>}
+        actions={<>
+          <button className="btn" onClick={exportCsv}>Export CSV</button>
+          <button className="btn" onClick={() => downloadAllReports(run.candidates, run.job)}>Download All Reports</button>
+        </>}
       />
 
       {/* ---- Selected: featured profile cards ---- */}

@@ -3,6 +3,7 @@ import { Avatar, Badge, Card, NeedRun, PageHead, ScoreRing, statusColor } from '
 import { CriteriaTree, GameTree, ProofTree, TraversalTable } from '../components/trees'
 import { ChainView } from '../components/chain'
 import { useApp } from '../state'
+import { downloadReport } from '../utils/reportGenerator'
 
 export default function CandidateDetail() {
   const { id } = useParams()
@@ -17,7 +18,10 @@ export default function CandidateDetail() {
 
   return (
     <>
-      <div className="row" style={{ marginBottom: 14 }}><Link className="btn sm" to="/results">← All candidates</Link></div>
+      <div className="row" style={{ marginBottom: 14, gap: 8 }}>
+        <Link className="btn sm" to="/results">← All candidates</Link>
+        <button className="btn sm" onClick={() => downloadReport(c, run.job)}>Download Report</button>
+      </div>
       <div className="card" style={{ marginBottom: 16 }}>
         <div className="cand-hero">
           <Avatar name={c.name} large />
