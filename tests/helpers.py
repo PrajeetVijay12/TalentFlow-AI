@@ -18,8 +18,9 @@ def sample_job(**overrides) -> JobRequirements:
 
 
 def load_samples():
+    """Load the 7 unique-candidate PDF resumes for unit tests (excludes .docx duplicates)."""
     out = []
-    for i, p in enumerate(sorted(SAMPLES.iterdir()), start=1):
+    for i, p in enumerate(sorted(SAMPLES.glob("*.pdf")), start=1):
         c = parse_resume_text(extract_text(p.name, p.read_bytes()), p.name)
         c.id = i
         out.append(c)

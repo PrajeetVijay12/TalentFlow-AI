@@ -99,11 +99,11 @@ def test_api_upload_errors_and_duplicates(client):
 
 def test_api_full_flow_with_samples(client):
     loaded = client.post("/api/samples/load").json()["results"]
-    assert [r["status"] for r in loaded].count("ok") == 7
+    assert [r["status"] for r in loaded].count("ok") == 10  # 7 PDFs + 3 DOCX variants
     r = client.post("/api/run")
     assert r.status_code == 200
     body = r.json()
-    assert body["summary"]["Selected"] == 2 and body["summary"]["total"] == 7
+    assert body["summary"]["Selected"] == 2 and body["summary"]["total"] == 10
     assert client.get("/api/run/latest").json()["summary"] == body["summary"]
     assert len(client.get("/api/algorithms").json()["table"]) == 9
 
@@ -131,10 +131,10 @@ def test_frontend_is_served_and_path_traversal_is_blocked(client):
 def test_loading_samples_never_overwrites_the_users_job_and_reports_duplicates(client):
     client.put("/api/job", json={"title": "My Own Job", "required_skills": ["Rust"], "min_cgpa": 9})
     first = client.post("/api/samples/load").json()
-    assert first["added"] == 7 and first["sample_job_applied"] is False
+    assert first["added"] == 10 and first["sample_job_applied"] is False  # 7 PDFs + 3 DOCX variants
     assert client.get("/api/job").json()["title"] == "My Own Job"            # untouched
     second = client.post("/api/samples/load").json()
-    assert second["added"] == 0 and second["already_loaded"] == 7             # the UI can tell the user why nothing changed
+    assert second["added"] == 0 and second["already_loaded"] == 10            # all 10 already present
 
 
 def test_loading_samples_for_a_new_user_applies_the_sample_job(client):
