@@ -5,8 +5,8 @@ import { CriteriaTree, GameTree, ProofTree, TraversalTable } from '../components
 import { ChainView } from '../components/chain'
 import { useApp } from '../state'
 
-const SLUGS: Record<string, number> = { bfs: 0, astar: 1, heuristic: 2, local: 3, sa: 4, csp: 5, forward: 6, backward: 7, resolution: 8, ab: 9 }
-const TABS = ['BFS / DFS', 'A* Search', 'Heuristic', 'Local Search', 'Simulated Annealing', 'CSP', 'Forward Chaining', 'Backward Chaining', 'Resolution', 'Alpha-Beta & Game Tree'] as const
+const SLUGS: Record<string, number> = { bfs: 0, astar: 1, heuristic: 2, local: 3, sa: 4, ga: 5, csp: 6, forward: 7, backward: 8, resolution: 9, ab: 10 }
+const TABS = ['BFS / DFS', 'A* Search', 'Heuristic', 'Local Search', 'Simulated Annealing', 'Genetic Algorithm', 'CSP', 'Forward Chaining', 'Backward Chaining', 'Resolution', 'Alpha-Beta & Game Tree'] as const
 
 export default function VisualizationPage() {
   const { run } = useApp()
@@ -226,6 +226,67 @@ export default function VisualizationPage() {
           </div>
         </>
       )}
+
+      {tab === 'Genetic Algorithm' && (run.genetic_algorithm ? (
+        <>
+          <div className="callout">
+            <b>Genetic Algorithm</b> evolves a <em>population</em> of candidate orderings over {run.genetic_algorithm.num_generations} generations.
+            &nbsp;Each individual (chromosome) is a permutation of candidates.
+            <b> Selection</b>: tournament (k=3). &nbsp;<b>Crossover</b>: Order Crossover (OX) copies a slice from parent&nbsp;1 and fills the rest from parent&nbsp;2 in order — no duplicates.
+            &nbsp;<b>Mutation</b>: random swap with P={run.genetic_algorithm.mutation_rate}.
+            &nbsp;<b>Elitism</b>: the best individual always survives.
+            Fitness = Σ score / log₂(position + 2) — the same DCG objective as HC and SA.
+          </div>
+          <div className="grid g2">
+            <Card title="Convergence" sub={`Population: ${run.genetic_algorithm.population_size} · Generations: ${run.genetic_algorithm.num_generations} · Crossover: ${run.genetic_algorithm.crossover_rate} · Mutation: ${run.genetic_algorithm.mutation_rate}`}>
+              <div className="callout">Initial ordering: {run.genetic_algorithm.initial_order.map(i => names[i]).join(' → ')}</div>
+              <div className="callout">Best ordering: <b>{run.genetic_algorithm.final_order.map(i => names[i]).join(' → ')}</b></div>
+              <table style={{ marginTop: 10 }}>
+                <thead><tr><th>Metric</th><th className="num">Hill Climbing</th><th className="num">Sim. Annealing</th><th className="num">Genetic Alg.</th></tr></thead>
+                <tbody>
+                  <tr><td>Initial fitness</td><td className="num">{run.local_search?.initial_objective ?? '—'}</td><td className="num">{run.simulated_annealing?.initial_objective ?? '—'}</td><td className="num">{run.genetic_algorithm.initial_fitness}</td></tr>
+                  <tr><td>Best fitness</td><td className="num">{run.local_search?.final_objective ?? '—'}</td><td className="num">{run.simulated_annealing?.final_objective ?? '—'}</td><td className="num"><b>{run.genetic_algorithm.best_fitness}</b></td></tr>
+                  <tr><td>Improvement</td><td className="num">{run.local_search ? (run.local_search.final_objective - run.local_search.initial_objective).toFixed(4) : '—'}</td><td className="num">{run.simulated_annealing ? (run.simulated_annealing.final_objective - run.simulated_annealing.initial_objective).toFixed(4) : '—'}</td><td className="num">{run.genetic_algorithm.improvement >= 0 ? '+' : ''}{run.genetic_algorithm.improvement}</td></tr>
+                  <tr><td>Escape local optima?</td><td style={{ color: 'var(--fail)' }}>No</td><td style={{ color: 'var(--pass)' }}>Yes (T-controlled)</td><td style={{ color: 'var(--pass)' }}>Yes (crossover)</td></tr>
+                  <tr><td>Mechanism</td><td>Adjacent swap</td><td>Any-pair swap</td><td>OX crossover + swap mutation</td></tr>
+                </tbody>
+              </table>
+              <div style={{ marginTop: 12 }}>
+                <b>Fitness trajectory</b> <span className="small muted">(best individual per generation)</span>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 2, marginTop: 6 }}>
+                  {run.genetic_algorithm.generations.map((f, i) => {
+                    const min = Math.min(...run.genetic_algorithm!.generations)
+                    const max = Math.max(...run.genetic_algorithm!.generations)
+                    const range = max - min || 1
+                    const h = Math.round(4 + ((f - min) / range) * 28)
+                    return <div key={i} title={`Gen ${i}: ${f}`} style={{ width: 6, height: h, background: 'var(--accent)', borderRadius: 2, alignSelf: 'flex-end', opacity: 0.7 + 0.3 * ((f - min) / range) }} />
+                  })}
+                </div>
+                <div className="small muted" style={{ marginTop: 4 }}>Each bar = one generation. Height = relative fitness.</div>
+              </div>
+            </Card>
+            <Card title="Improvement events" sub="Generations where a new best individual was found">
+              {run.genetic_algorithm.events.length === 0
+                ? <div className="muted">No improvement events — initial population already optimal.</div>
+                : <table>
+                    <thead><tr><th>Generation</th><th className="num">Best fitness</th><th className="num">Δ</th><th>Best order</th></tr></thead>
+                    <tbody>
+                      {run.genetic_algorithm.events.map((e, i) => (
+                        <tr key={i}>
+                          <td>Gen {e.generation}</td>
+                          <td className="num">{e.fitness}</td>
+                          <td className="num" style={{ color: 'var(--pass)' }}>+{e.improvement}</td>
+                          <td className="small muted">{e.order.map(n => n.split(' ')[0]).join(' → ')}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>}
+              {run.genetic_algorithm.events.length === 0 && run.genetic_algorithm.improvement === 0 &&
+                <div className="small muted" style={{ marginTop: 8 }}>The initial ordering was already at (or near) a global optimum for this dataset.</div>}
+            </Card>
+          </div>
+        </>
+      ) : <Card><div className="muted">No eligible candidates — genetic algorithm did not run.</div></Card>)}
 
       {tab === 'Alpha-Beta & Game Tree' && (run.alpha_beta ? (
         <>

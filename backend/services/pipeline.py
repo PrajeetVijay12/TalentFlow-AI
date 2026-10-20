@@ -19,6 +19,7 @@ from backend.algorithms.forward_chaining import forward_chain
 from backend.algorithms.game_tree import perspective_scores
 from backend.algorithms.heuristic import best_first_order, compute_score
 from backend.algorithms.knowledge_base import build_facts, build_rules
+from backend.algorithms.genetic import genetic_algorithm
 from backend.algorithms.local_search import local_search
 from backend.algorithms.resolution import resolution_prove
 from backend.algorithms.simulated_annealing import simulated_annealing
@@ -78,21 +79,23 @@ def run_pipeline(job: JobRequirements, candidates: list[CandidateProfile]) -> di
                    "input": len(eligible), "output": len(eligible), "ms": tm.lap(),
                    "summary": "Scored with h(n) = 0.4·S + 0.3·E + 0.2·P + 0.1·C (job weights)."})
 
-    # --- Stage 4: local search (hill climbing) + simulated annealing ---------------
+    # --- Stage 4: local search (hill climbing) + simulated annealing + GA ----------
     names = {c.id: c.name for c in candidates}
     initial = [c.id for c in eligible]  # upload order
     ls = local_search(initial, scores, names) if eligible else None
     sa = simulated_annealing(initial, scores, names) if eligible else None
+    ga = genetic_algorithm(initial, scores, names) if eligible else None
     if ls:
         for cid in initial:
             res[cid]["local_search"] = {"initial_rank": ls["initial_order"].index(cid) + 1,
                                         "final_rank": ls["final_order"].index(cid) + 1,
                                         "moved": ls["initial_order"].index(cid) != ls["final_order"].index(cid)}
-    stages.append({"id": "local_search", "label": "Local Search", "algorithm": "Hill climbing (adjacent swaps) + Simulated Annealing",
+    stages.append({"id": "local_search", "label": "Local Search", "algorithm": "Hill Climbing + Simulated Annealing + Genetic Algorithm",
                    "input": len(eligible), "output": len(eligible), "ms": tm.lap(),
                    "summary": (f"HC: {ls['iterations']} improving swap(s), obj {ls['initial_objective']}→{ls['final_objective']}. "
-                               f"SA: {sa['accepted_moves']} accepted moves ({sa['accepted_worse_moves']} uphill), obj {sa['initial_objective']}→{sa['final_objective']}."
-                               if ls and sa else "No eligible candidates to order.")})
+                               f"SA: {sa['accepted_moves']} accepted moves ({sa['accepted_worse_moves']} uphill). "
+                               f"GA: {ga['num_generations']} generations, best fitness {ga['best_fitness']} (Δ={ga['improvement']:+})."
+                               if ls and sa and ga else "No eligible candidates to order.")})
 
     # --- Stage 5: CSP -----------------------------------------------------------------
     for c in candidates:
@@ -216,5 +219,6 @@ def run_pipeline(job: JobRequirements, candidates: list[CandidateProfile]) -> di
         "heuristic_best_first": [{**s, "name": names[s["id"]]} for s in best_first],
         "local_search": ls and {**ls, "names": {str(k): v for k, v in names.items() if k in initial}},
         "simulated_annealing": sa and {**sa, "names": {str(k): v for k, v in names.items() if k in initial}},
+        "genetic_algorithm": ga and {**ga, "names": {str(k): v for k, v in names.items() if k in initial}},
         "alpha_beta": ab,
     }

@@ -131,6 +131,14 @@ export interface SimulatedAnnealing {
   T0: number; alpha: number; neighbour_definition: string; steps: SAStep[]; names: Record<string, string>
 }
 
+// ---- genetic algorithm
+export interface GAEvent { generation: number; fitness: number; improvement: number; order: string[]; note: string }
+export interface GeneticAlgorithm {
+  initial_order: number[]; final_order: number[]; initial_fitness: number; best_fitness: number; improvement: number
+  generations: number[]; population_size: number; num_generations: number
+  crossover_rate: number; mutation_rate: number; events: GAEvent[]; names: Record<string, string>
+}
+
 // ---- resolution
 export interface ResolutionClause { type: string; clause: string[]; source?: string; text?: string; id?: string }
 export interface ResolutionStep { from_clauses: string[][]; resolvent: string[]; note: string }
@@ -167,6 +175,7 @@ export interface RunResult {
   heuristic_best_first: { step: number; id: number; h: number; frontier_size: number; name: string }[]
   local_search: LocalSearch | null
   simulated_annealing: SimulatedAnnealing | null
+  genetic_algorithm: GeneticAlgorithm | null
   alpha_beta: AlphaBeta | null
 }
 
